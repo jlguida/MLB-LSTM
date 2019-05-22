@@ -23,11 +23,12 @@ np.random.seed(7)
 # define validation size, this equates to number of seasons
 VALIDATION_SIZE = 3
 HIDDEN_SIZE = 162
-BATCH_SIZE = 2
+BATCH_SIZE = 486
 NUM_STEPS = 3
 
 
 def run():
+
     ethier=np.zeros([12,162,26])
     for x in range(12):
         year = 2006+x
@@ -37,35 +38,43 @@ def run():
     
     #Training instances
     X_train=ethier[:-VALIDATION_SIZE-1]
-    X_train = X_train.reshape((8,4212))
-    print(X_train[:5])
-    V=ethier[-VALIDATION_SIZE:][:,:,[3]]
-    print(V.shape)
-    Y=ethier[1:-VALIDATION_SIZE][:,:,[3]]
+    X_train = X_train.reshape((1296,26))
+    X_train = np.nan_to_num(X_train)
+    print(X_train[:35])
+    V=ethier[-VALIDATION_SIZE:]
+    V=V.reshape((486,26))
+    V=np.nan_to_num(V)
+    Y=ethier[1:-VALIDATION_SIZE]
+    Y = Y.reshape((1296,26))
+    Y = np.nan_to_num(Y)
 
     #Testing instances for training
-    Y_train=np.zeros([8])
-    for i,row in enumerate(Y):
-        Y_train[i]=np.sum(row)
-    Y_train = Y_train.reshape((8,))
-    print(Y_train[:5])
+    Y_train=np.zeros([1296])
+    i = 0
+    for row in Y:
+        Y_train[i]=row[3]
+        i = i+1
+    Y_train = Y_train.reshape((1296,))
 
     #Validation instances
-    V_data=ethier[-VALIDATION_SIZE:]
-    V_data = V_data.reshape((3,4212))
-    print(V_data[:3])
+    V_data=ethier[-VALIDATION_SIZE-1:-1]
+    V_data = V_data.reshape((486,26))
+
     #Validation testing data
-    V_test = np.zeros([3])
+    V_test = np.zeros([486])
     for i,row in enumerate(V):
-        V_test[i]=np.sum(row)
-    V_test = V_test.reshape((3,))
-    print(V_test[:3])
+        V_test[i]=row[3]
+    V_test = V_test.reshape((486,))
+    print(X_train.shape)
+    print(Y_train.shape)
+    print(V_data.shape)
+    print(V_test.shape)
     #Build model !!!
     model=Sequential()
-    model.add(Dense(50, input_dim=4212, activation='relu'))
-    model.add(Dense(25, activation='relu'))
-    model.add(Dense(1, activation='softmax'))
-    layer_name =0
+    model.add(Dense(50, input_dim=26, activation='relu'))
+    model.add(Dense(12, activation='relu'))
+    model.add(Dense(1, activation='linear'))
+    layer_name = 0
     
     #model.add(LSTM(units=HIDDEN_SIZE, unroll=True, input_shape=(162,50,)))
     #model.add(LSTM(units=HIDDEN_SIZE, unroll=True, dropout=0.5,input_shape=(162,50,)))
@@ -73,23 +82,23 @@ def run():
     #model.add(Activation('softmax'))
 
     #Train the model
-    model.compile(loss='mse', optimizer='rmsprop', metrics=['accuracy'])
+    model.compile(loss='mse', optimizer='adam', metrics=['mean_squared_error'])
     print(model.layers[0].output)
     print(model.layers[1].output)
     print(model.layers[2].output)
     model.fit(X_train, Y_train, epochs=150, batch_size=BATCH_SIZE)
     intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[layer_name].input)
+                                 outputs=model.layers[layer_name].output)
     intermediate_output = intermediate_layer_model.predict(V_data)
-    print (intermediate_output)
+    #print (intermediate_output)
     intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[1].input)
+                                 outputs=model.layers[1].output)
     intermediate_output = intermediate_layer_model.predict(V_data)
-    print (intermediate_output)
+    #print (intermediate_output)
     intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[2].input)
+                                 outputs=model.layers[2].output)
     intermediate_output = intermediate_layer_model.predict(V_data)
-    print (intermediate_output)
+    #print (intermediate_output)
     print(model.summary())
     scores = model.evaluate(V_data, V_test)
     print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
