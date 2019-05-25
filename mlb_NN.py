@@ -23,7 +23,7 @@ np.random.seed(7)
 # define validation size, this equates to number of seasons
 VALIDATION_SIZE = 3
 HIDDEN_SIZE = 162
-BATCH_SIZE = 486
+BATCH_SIZE = 75
 NUM_STEPS = 3
 
 
@@ -65,13 +65,18 @@ def run():
     for i,row in enumerate(V):
         V_test[i]=row[3]
     V_test = V_test.reshape((486,))
+    X_train = X_train.reshape((162,8,26))
+    V_data = np.delete(V_data,[480,481,482,483,484,485],0)
+    print(V_data.shape)
+    V_data = V_data.reshape((60,8,26))
     print(X_train.shape)
     print(Y_train.shape)
     print(V_data.shape)
     print(V_test.shape)
     #Build model !!!
     model=Sequential()
-    model.add(Dense(50, input_dim=26, activation='relu'))
+    model.add(LSTM(units=100, unroll=True, input_shape=(8,26), return_sequences = True))
+    model.add(TimeDistributed(Dense(50)))
     model.add(Dense(12, activation='relu'))
     model.add(Dense(1, activation='linear'))
     layer_name = 0
@@ -82,23 +87,23 @@ def run():
     #model.add(Activation('softmax'))
 
     #Train the model
-    model.compile(loss='mse', optimizer='adam', metrics=['mean_squared_error'])
+    model.compile(loss='mae', optimizer='adagrad', metrics=['mae'])
     print(model.layers[0].output)
     print(model.layers[1].output)
     print(model.layers[2].output)
-    model.fit(X_train, Y_train, epochs=150, batch_size=BATCH_SIZE)
-    intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[layer_name].output)
-    intermediate_output = intermediate_layer_model.predict(V_data)
-    #print (intermediate_output)
-    intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[1].output)
-    intermediate_output = intermediate_layer_model.predict(V_data)
-    #print (intermediate_output)
-    intermediate_layer_model = Model(inputs=model.input,
-                                 outputs=model.layers[2].output)
-    intermediate_output = intermediate_layer_model.predict(V_data)
-    #print (intermediate_output)
+    #model.fit(X_train, Y_train, epochs=150, batch_size=BATCH_SIZE)
+    #intermediate_layer_model = Model(inputs=model.input,
+                                 #outputs=model.layers[layer_name].output)
+    #intermediate_output = intermediate_layer_model.predict(V_data)
+    #print ("Layer 1 output: ", intermediate_output)
+    #intermediate_layer_model = Model(inputs=model.input,
+                                 #outputs=model.layers[1].output)
+    #intermediate_output = intermediate_layer_model.predict(V_data)
+    #print ("Layer 2 output: ",intermediate_output)
+    #intermediate_layer_model = Model(inputs=model.input,
+                                 #outputs=model.layers[2].output)
+    #intermediate_output = intermediate_layer_model.predict(V_data)
+    #print ("Layer 3 output: ",intermediate_output)
     print(model.summary())
     scores = model.evaluate(V_data, V_test)
     print("\n%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
