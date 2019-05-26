@@ -92,11 +92,11 @@ def run():
     #Build model !!!
     model=Sequential()
     model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences = True))
-    model.add(Dropout(.20))
+    model.add(Dropout(.50))
     model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences = True))
-    model.add(Dropout(.20))
+    model.add(Dropout(.40))
     model.add(TimeDistributed(Dense(25, activation='relu')))
-    model.add(Dropout(.20))
+    model.add(Dropout(.30))
     model.add(TimeDistributed(Dense(2, activation='sigmoid')))
     model.add(TimeDistributed(Dense(2, activation='sigmoid')))
 
@@ -120,11 +120,14 @@ def run():
     predicted_true = 0
     predicted_false = 0
     total_true = 0
+    total_false = 0
     for i in range(58):
         for j in range(8):
             most_likely = np.argmax(predictions[i][j])
             if(most_likely != 0):
                 total_true += 1
+            else:
+                total_false += 1
             if (most_likely == np.argmax(V_test[i][j])):
                 correct = correct + 1
                 if(most_likely != 0):
@@ -135,10 +138,10 @@ def run():
             else:
                 incorrect = incorrect + 1
 
-    print(" \n Correct: \n", correct)
-    print(" \n Incorrect: \n", incorrect)
+    print(" \n Correct: \n", correct, correct/(58*8))
+    print(" \n Incorrect: \n", incorrect, incorrect/(58*8))
     print(" \n Predicted True: \n", predicted_true, predicted_true/total_true)
-    print(" \n Predicted False: \n", predicted_false)
+    print(" \n Predicted False: \n", predicted_false, predicted_false/total_false)
 
 
 
