@@ -28,62 +28,82 @@ NUM_STATS = 9
 BATCH_SIZE = 75
 GAMES_IN_A_SEASON = 162
 NUM_STEPS = 3
+TOTAL_GAMES = 0
+VALIDATION_SEASON = 3 
+NUM_CATEGORIES = 3
 
 
 def run():
     # fix random seed for reproducibility
     np.random.seed(7)
+
+    #Create the Andre Ethier stat matrix ()
     ethier=np.zeros([12,162,NUM_STATS])
     for x in range(12):
         year = 2006+x
-        print("Loading season " + str(year))
         file='ethier'+str(year)+'.csv'
         ethier[x]=parse_PlayerSeason(file, year)
     ethier=ethier.reshape((1944,NUM_STATS))
     ethier=np.delete(ethier,[1942,1941,1940,1939,1938,1937,1936],0)
-    print(ethier[:30])
+    TOTAL_GAMES = ethier.shape[0]
+    print(ethier.shape)
+
+
     #Training instances
-    X_train=ethier[:-1]
-    X_train = np.nan_to_num(X_train)
-    V=ethier[GAMES_IN_A_SEASON*3+1:GAMES_IN_A_SEASON*3+VALIDATION_SIZE+1]
+    ethier = np.nan_to_num(ethier)
+    X_train = np.zeros([TOTAL_GAMES-VALIDATION_SIZE,NUM_STATS])
+    Y_train = np.zeros([TOTAL_GAMES-VALIDATION_SIZE,NUM_CATEGORIES])
+    for i,row in enumerate(ethier):
+        if(i < TOTAL_GAMES-VALIDATION_SIZE):
+            if(i < GAMES_IN_A_SEASON*VALIDATION_SEASON | i > GAMES_IN_A_SEASON * VALIDATION_SEASON + VALIDATION_SIZE):
+                category=np.zeros(NUM_CATEGORIES)
+                scores = 0
+                if(ethier[i+1][1] == 1):
+                    scores = 1
+                if(ethier[i+1][1] > 1):
+                    scores = 2
+                category[scores] = 1
+                Y_train[i] = category
+                X_train[i] = row
+
+    Y_train = np.delete(Y_train,[1450,1449,1448],0)
+    print(Y_train.shape)
+    Y_train = Y_train.reshape((181,TIME_STEP,NUM_CATEGORIES))
+    print(Y_train.shape)
+    X_train = np.delete(X_train,[1450,1449,1448],0)
+    X_train = X_train.reshape((181,TIME_STEP,NUM_STATS))
+    print("X_train shape: ", X_train.shape)
+    print("Y_train shape: ", Y_train.shape)
+
+
+    
+    V=ethier[GAMES_IN_A_SEASON*VALIDATION_SEASON+1:GAMES_IN_A_SEASON*VALIDATION_SEASON+VALIDATION_SIZE+1]
     V=V.reshape((486,NUM_STATS))
     V=np.nan_to_num(V)
-    Y=ethier[1:]
-    Y = np.nan_to_num(Y)
-    print(Y.shape)
-    #Testing instances for training
-    Y_train=np.zeros([1936,2])
-    i = 0
-    for row in Y:
-        category=np.zeros(2)
-        scores = 0
-        if(row[1] > 0):
-            scores = 1
-        category[scores]=1
-        Y_train[i]=category
-        i = i+1
-    Y_train = Y_train.reshape((242,TIME_STEP,2))
+    
+    
 
     #Validation instances
     V_data=ethier[GAMES_IN_A_SEASON*3:GAMES_IN_A_SEASON*3+VALIDATION_SIZE]
     V_data = V_data.reshape((486,NUM_STATS))
 
     #Validation testing data
-    V_test = np.zeros([486,2])
+    V_test = np.zeros([486,NUM_CATEGORIES])
     for i,row in enumerate(V):
-        category=np.zeros(2)
+        category=np.zeros(NUM_CATEGORIES)
         scores = 0
-        if(row[1] > 0):
+        if(row[1] == 1):
             scores = 1
+        if(row[1] > 1):
+            scores = 2
         category[scores]=1
         V_test[i]=category
-    V_test = V_test.reshape((486,2))
-
-    X_train = X_train.reshape((242,TIME_STEP,NUM_STATS))
+    V_test = V_test.reshape((486,NUM_CATEGORIES))
+    
     V_data = np.delete(V_data,[479,480,481,482,483,484],0)
     V_test = np.delete(V_test,[479,480,481,482,483,484],0)
     V_data = V_data.reshape((60,TIME_STEP,NUM_STATS))
-    V_test = V_test.reshape((60,TIME_STEP,2))
+    V_test = V_test.reshape((60,TIME_STEP,NUM_CATEGORIES))
     print(" \n X_train: First Game of 1st season (32 games): \n ", X_train[:4])
     print("\n V_data: 1st game of 4th season (8 games): \n", V_data[0])
     print("\n Y_train: Second Game of 1st season (32 games): \n", Y_train[:4])
@@ -91,14 +111,16 @@ def run():
  
     #Build model !!!
     model=Sequential()
-    model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences = True))
-    model.add(Dropout(.50))
-    model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences = True))
-    model.add(Dropout(.40))
+    #model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS)))
+    #model.add(Dropout(.2))
+    #model.add(Dense(3, activation='softmax'))
+    model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences=True))
+    model.add(LSTM(units=25, input_shape=(TIME_STEP,NUM_STATS), return_sequences=True))
+    #model.add(Dropout(.2))
     model.add(TimeDistributed(Dense(25, activation='relu')))
-    model.add(Dropout(.30))
-    model.add(TimeDistributed(Dense(2, activation='sigmoid')))
-    model.add(TimeDistributed(Dense(2, activation='sigmoid')))
+    model.add(TimeDistributed(Dense(3, activation='softmax')))
+    model.add(TimeDistributed(Dense(3, activation='softmax')))
+
 
 
     #Train the model
@@ -106,42 +128,59 @@ def run():
     model.fit(X_train, Y_train, epochs=1, batch_size=BATCH_SIZE)
 
     #Testing tensor output
-    for i in range(7):
+    for i in range(5):
         intermediate_layer_model = Model(inputs=model.input,outputs=model.layers[i].output)
         intermediate_output = intermediate_layer_model.predict(V_data)
-        print ("Layer " + str(i) + " output: ", intermediate_output)
+        #print ("Layer " + str(i) + " output: ", intermediate_output)
     print(model.summary())
-    scores = model.evaluate(V_data, V_test)
-    print("\n%s: %.2f%%" % ('accuracy', scores[1]*100))
+    #scores = model.evaluate(V_data, V_test)
+    #print("\n%s: %.2f%%" % ('accuracy', scores[1]*100))
     predictions = model.predict(V_data)
     print("\n\n\n Predictions for 4th season (30 games): \n\n\n")
+    print (predictions)
     correct = 0
     incorrect = 0
-    predicted_true = 0
+    predicted_1 = 0
+    predicted_2 = 0
     predicted_false = 0
-    total_true = 0
-    total_false = 0
-    for i in range(58):
+    total_games_with_hits = 0
+    total_games_without_hits = 0
+    twohits = 0
+
+    
+    for i in range(0,58):
         for j in range(8):
             most_likely = np.argmax(predictions[i][j])
-            if(most_likely != 0):
-                total_true += 1
-            else:
-                total_false += 1
+            if(np.argmax(V_test[i][j]) == 1):
+                total_games_with_hits += 1
+            if(np.argmax(V_test[i][j]) == 2):
+                twohits += 1
+            if(np.argmax(V_test[i][j]) == 0):
+                total_games_without_hits += 1
             if (most_likely == np.argmax(V_test[i][j])):
                 correct = correct + 1
-                if(most_likely != 0):
-                    predicted_true += 1
-                    print(" \n Predicted: ", predictions[i][j]," Runs: ",most_likely," Actual: ", np.argmax(V_test[i][j]), "\n")
+                if(most_likely == 1):
+                    predicted_1 += 1
+                    #print(" \n Predicted: ", predictions[i][j]," Runs: ",most_likely," Actual: ", np.argmax(V_test[i][j]), "\n")
+                if(most_likely == 2):
+                    predicted_2 += 1
                 else:
                     predicted_false += 1
             else:
+                print(" \n Predicted: ", predictions[i][j]," Runs: ",most_likely," Actual: ", np.argmax(V_test[i][j]), "\n")
                 incorrect = incorrect + 1
 
     print(" \n Correct: \n", correct, correct/(58*8))
     print(" \n Incorrect: \n", incorrect, incorrect/(58*8))
-    print(" \n Predicted True: \n", predicted_true, predicted_true/total_true)
-    print(" \n Predicted False: \n", predicted_false, predicted_false/total_false)
+    print(total_games_with_hits,twohits,total_games_without_hits)
+    print(" \n Predicted 1 hit: \n", predicted_1, predicted_1/total_games_with_hits)
+    print(" \n Predicted 2 hit: \n", predicted_2, predicted_2/twohits)
+    print(" \n Predicted 0 hit: \n", predicted_false, predicted_false/total_games_without_hits)
+    print(" \n Percent 0 hit games: \n", total_games_without_hits/(58*8))
+    print(" \n Percent 1 hit games: \n", total_games_with_hits/(58*8))
+    print(" \n Percent 1+ hit games: \n", twohits/(58*8))
+
+
 
 
 
