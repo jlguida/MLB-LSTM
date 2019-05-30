@@ -128,7 +128,7 @@ def run():
     model.fit(X_train, Y_train, epochs=1, batch_size=BATCH_SIZE)
 
     #Testing tensor output
-    for i in range(5):
+    for i in range(4):
         intermediate_layer_model = Model(inputs=model.input,outputs=model.layers[i].output)
         intermediate_output = intermediate_layer_model.predict(V_data)
         #print ("Layer " + str(i) + " output: ", intermediate_output)
